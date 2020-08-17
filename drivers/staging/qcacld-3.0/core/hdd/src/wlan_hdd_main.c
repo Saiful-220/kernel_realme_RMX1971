@@ -185,26 +185,6 @@ static struct cdev wlan_hdd_state_cdev;
 static struct class *class;
 static dev_t device;
 static bool hdd_loaded = false;
-#ifndef MODULE
-static struct gwlan_loader *wlan_loader;
-static ssize_t wlan_boot_cb(struct kobject *kobj,
-			    struct kobj_attribute *attr,
-			    const char *buf, size_t count);
-struct gwlan_loader {
-	bool loaded_state;
-	struct kobject *boot_wlan_obj;
-	struct attribute_group *attr_group;
-};
-
-static struct kobj_attribute wlan_boot_attribute =
-	__ATTR(boot_wlan, 0220, NULL, wlan_boot_cb);
-
-static struct attribute *attrs[] = {
-	&wlan_boot_attribute.attr,
-	NULL,
-};
-#define MODULE_INITIALIZED 1
-#endif
 
 #define HDD_OPS_INACTIVITY_TIMEOUT (120000)
 #define MAX_OPS_NAME_STRING_SIZE 20
@@ -14096,7 +14076,7 @@ static ssize_t wlan_hdd_state_ctrl_param_write(struct file *filp,
 		}
 	}
 
-	if (!cds_is_driver_loaded()) {
+	if (!cds_is_driver_loaded() || cds_is_driver_recovering()) {
 		init_completion(&wlan_start_comp);
 		rc = wait_for_completion_timeout(&wlan_start_comp,
 				msecs_to_jiffies(HDD_WLAN_START_WAIT_TIME));
@@ -14376,11 +14356,6 @@ static int hdd_driver_load(void)
 
 pld_deinit:
 	pld_deinit();
-	/* Wait for any ref taken on /dev/wlan to be released */
-	while (qdf_atomic_read(&wlan_hdd_state_fops_ref))
-		;
-param_destroy:
-	wlan_hdd_state_ctrl_param_destroy();
 wakelock_destroy:
 	qdf_wake_lock_destroy(&wlan_wake_lock);
 comp_deinit:
