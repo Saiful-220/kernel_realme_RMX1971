@@ -1188,6 +1188,9 @@ void __init adjust_lowmem_bounds(void)
 		phys_addr_t block_start = reg->base;
 		phys_addr_t block_end = reg->base + reg->size;
 
+		if (memblock_is_nomap(reg))
+			continue;
+
 		if (reg->base < vmalloc_limit) {
 			if (block_end > lowmem_limit)
 				/*
@@ -1669,7 +1672,13 @@ static noinline void __init split_pmd(pmd_t *pmd, unsigned long addr,
 	pte = start_pte;
 
 	do {
-		set_pte_ext(pte, pfn_pte(pfn, type->prot_pte), 0);
+		if (((unsigned long)_stext <= addr) &&
+			(addr < (unsigned long)__init_end))
+			set_pte_ext(pte, pfn_pte(pfn,
+				mem_types[MT_MEMORY_RWX].prot_pte), 0);
+		else
+			set_pte_ext(pte, pfn_pte(pfn,
+				mem_types[MT_MEMORY_RW].prot_pte), 0);
 		pfn++;
 	} while (pte++, addr += PAGE_SIZE, addr != end);
 
